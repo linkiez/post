@@ -3,6 +3,7 @@ const { parse } = require("csv-parse");
 const https = require('https');
 
 pessoa();
+produto();
 
 function pessoa(){
   fs.createReadStream("./pessoa.csv")
@@ -12,7 +13,7 @@ function pessoa(){
         nome: row[3]==""?row[2]:row[3],
         razao_social: row[3],
         pessoa_juridica: row[4]=="J"?true:false,
-        cnpj_cpf: row[5].replace(/\D/g, ''),
+        cnpj_cpf: row[5].replace(/\D/g, '')==''?null:row[5].replace(/\D/g, ''),
         endereco: `${row[6]}, ${row[7]}, ${row[8]}, ${row[9]}`,
         cep: row[10].replace(/\D/g, '')==''?null:row[10].replace(/\D/g, ''),
         municipio: row[11],
@@ -21,6 +22,23 @@ function pessoa(){
         telefone: row[14].replace(/\D/g, '')==''?null:row[14].replace(/\D/g, ''),
   }
   postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa)
+  .then((data) => {
+    console.log(data); // JSON data parsed by `data.json()` call
+  });
+})
+}
+
+function produto(){
+  fs.createReadStream("./produto.csv")
+  .pipe(parse({ delimiter: ",", from_line: 1 }))
+  .on("data", function (row) {
+    let produto = {
+      nome: row[0],
+      categoria: row[2],
+      espessura: Number(row[3].replace(',', '.')),
+      peso: Number(row[4].replace(',', '.'))
+  }
+  postData({ toString: () => 'http://localhost:3000/produto' }, produto)
   .then((data) => {
     console.log(data); // JSON data parsed by `data.json()` call
   });
