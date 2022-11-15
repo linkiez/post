@@ -1,9 +1,45 @@
 const fs = require("fs");
 const { parse } = require("csv-parse");
 const https = require('https');
+const usuario = require('./usuario.json')
 
-pessoa();
+usuarios();
 produto();
+fornecedor();
+pessoa();
+
+function usuarios(){
+  postData({ toString: () => 'http://localhost:3000/usuario' }, usuario)
+  .then((data) => {
+    console.log(data);
+  });
+}
+
+function fornecedor(){
+  fs.createReadStream("./fornecedor.csv")
+  .pipe(parse({ delimiter: ",", from_line: 1 }))
+  .on("data", function (row) {
+    let pessoa = {
+        nome: row[0],
+        pessoa_juridica: row[8].replace(/\D/g, '').length==14?true:false,
+        cnpj_cpf: row[8].replace(/\D/g, '')==''?null:row[8].replace(/\D/g, ''),
+        endereco: row[2],
+        cep: row[6].replace(/\D/g, '')==''?null:row[6].replace(/\D/g, ''),
+        municipio: row[4],
+        telefone: row[3].replace(/\D/g, '')==''?null:row[3].replace(/\D/g, ''),
+        fornecedor: {
+          data_aprov: new Date(row[9]),
+          data_venc: new Date(row[12]),
+          observacao: `${row[11]},
+          ${row[10]}`,
+        }
+  }
+  postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa)
+  .then((data) => {
+    console.log(data);
+  });
+})
+}
 
 function pessoa(){
   fs.createReadStream("./pessoa.csv")
@@ -23,7 +59,7 @@ function pessoa(){
   }
   postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa)
   .then((data) => {
-    console.log(data); // JSON data parsed by `data.json()` call
+    console.log(data);
   });
 })
 }
@@ -40,7 +76,7 @@ function produto(){
   }
   postData({ toString: () => 'http://localhost:3000/produto' }, produto)
   .then((data) => {
-    console.log(data); // JSON data parsed by `data.json()` call
+    console.log(data); 
   });
 })
 }
