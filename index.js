@@ -2,17 +2,69 @@ const fs = require("fs");
 const { parse } = require("csv-parse");
 const https = require('https');
 const usuario = require('./usuario.json')
+let pedidoCompraItems = [];
+const moment = require('moment');
 
-usuarios();
-produto();
-fornecedor();
-pessoa();
+const Queue = require("queue-promise");
+
+const queue = new Queue({
+  concurrent: 4,
+  interval: 100,
+  start: true
+});
+
+queue.on("resolve", data => console.log(data));
+queue.on("reject", error => console.error(error));
+
+// usuarios();
+// produto();
+// fornecedor();
+// pessoa();
+pedidoCompra();
+
+function pedidoCompra(){
+  fs.createReadStream('./pedidoCompraItem.csv')
+  .pipe(parse({ delimiter: ",", from_line: 1 }))
+  .on("data", function(row) {
+    let item = {
+      pedido: row[0],
+      produto: row[1],
+      dimensao: row[2],
+      quantidade: row[3].replace(",","."),
+      peso: row[4].replace(",","."),
+      preco: row[5].replace(",",".").replace("R$","").replace(" ",""),
+      ipi: row[6].replace(",","."),
+      prazo: moment(row[7], 'DD/MM/YYYY').toDate()
+    }
+    pedidoCompraItems.push(item);
+  });
+
+  fs.createReadStream('./pedidoCompra.csv')
+  .pipe(parse({ delimiter: ",", from_line: 1 }))
+  .on("data", async (row)=> {
+    let pedido = {
+      pedido: row[0],
+      Fornecedor: row[1],
+      data_emissao: moment(row[2], 'DD/MM/YYYY').toDate(),
+      cond_pagamento: row[3],
+      frete: Number(row[4].replace(/\D/g, '')),
+      transporte: row[5],
+    }
+    pedido.itens = pedidoCompraItems.filter((item) => item.pedido === pedido.pedido)
+    pedido.status = "Aprovado"
+    pedido.total = 0
+    pedido.itens.forEach(item => {
+      pedido.total += (Number(item.peso)*Number(item.preco)*(Number(item.ipi)+1))+Number(pedido.frete)
+    });
+
+    queue.enqueue(() => postData({ toString: () => 'http://localhost:3000/pedidocompra/import' }, pedido)
+    )
+  })
+}
 
 function usuarios(){
-  postData({ toString: () => 'http://localhost:3000/usuario' }, usuario)
-  .then((data) => {
-    console.log(data);
-  });
+  queue.enqueue(() => postData({ toString: () => 'http://localhost:3000/usuario' }, usuario))
+
 }
 
 function fornecedor(){
@@ -34,10 +86,7 @@ function fornecedor(){
           ${row[10]}`,
         }
   }
-  postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa)
-  .then((data) => {
-    console.log(data);
-  });
+  queue.enqueue(() => postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa))
 })
 }
 
@@ -57,10 +106,7 @@ function pessoa(){
         email: row[13]==''?null:row[13],
         telefone: row[14].replace(/\D/g, '')==''?null:row[14].replace(/\D/g, ''),
   }
-  postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa)
-  .then((data) => {
-    console.log(data);
-  });
+  queue.enqueue(() => postData({ toString: () => 'http://localhost:3000/pessoa' }, pessoa))
 })
 }
 
@@ -74,10 +120,8 @@ function produto(){
       espessura: Number(row[3].replace(',', '.')),
       peso: Number(row[4].replace(',', '.'))
   }
-  postData({ toString: () => 'http://localhost:3000/produto' }, produto)
-  .then((data) => {
-    console.log(data); 
-  });
+  queue.enqueue(() => postData({ toString: () => 'http://localhost:3000/produto' }, produto))
+
 })
 }
 
@@ -102,5 +146,3 @@ async function postData(url = '', data = {}) {
   });
   return response.json(); // parses JSON response into native JavaScript objects
 }
-
-
