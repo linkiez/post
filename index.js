@@ -9,20 +9,29 @@ const Queue = require("queue-promise");
 
 const queue = new Queue({
   concurrent: 1,
-  interval: 250,
+  interval: 100,
   start: true,
 });
 
 queue.on("resolve", (data) => console.log(data));
 queue.on("reject", (error) => console.error(error));
 
-usuarios();
-produto();
-fornecedor();
-pedidoCompra();
-pessoa();
+const auth = postData(
+  { toString: () => "http://localhost:2486/login" },
+  { email: "linkiez@gmail.com", senha: "!Fabio12" }
+);
 
-function pedidoCompra() {
+auth.then((data) => {
+  console.log(data);
+  const token = data.accessToken;
+
+  produto();
+  fornecedor();
+  pedidoCompra();
+  pessoa();
+});
+
+function pedidoCompra(token) {
   fs.createReadStream("./pedidoCompraItem.csv")
     .pipe(parse({ delimiter: ",", from_line: 1 }))
     .on("data", function (row) {
@@ -64,19 +73,16 @@ function pedidoCompra() {
       queue.enqueue(() =>
         postData(
           { toString: () => "http://localhost:3000/pedidocompra/import" },
-          pedido
+          pedido,
+          token
         )
       );
     });
 }
 
-function usuarios() {
-  queue.enqueue(() =>
-    postData({ toString: () => "http://localhost:3000/usuario" }, usuario)
-  );
-}
 
-function fornecedor() {
+
+function fornecedor(token) {
   fs.createReadStream("./fornecedor.csv")
     .pipe(parse({ delimiter: ",", from_line: 1 }))
     .on("data", function (row) {
@@ -98,12 +104,12 @@ function fornecedor() {
         },
       };
       queue.enqueue(() =>
-        postData({ toString: () => "http://localhost:3000/pessoa" }, pessoa)
+        postData({ toString: () => "http://localhost:3000/pessoa" }, pessoa, token)
       );
     });
 }
 
-function pessoa() {
+function pessoa(token) {
   fs.createReadStream("./pessoa.csv")
     .pipe(parse({ delimiter: ",", from_line: 1 }))
     .on("data", function (row) {
@@ -123,12 +129,12 @@ function pessoa() {
           row[14].replace(/\D/g, "") == "" ? null : row[14].replace(/\D/g, ""),
       };
       queue.enqueue(() =>
-        postData({ toString: () => "http://localhost:3000/pessoa" }, pessoa)
+        postData({ toString: () => "http://localhost:3000/pessoa" }, token)
       );
     });
 }
 
-function produto() {
+function produto(token) {
   fs.createReadStream("./produto.csv")
     .pipe(parse({ delimiter: ",", from_line: 1 }))
     .on("data", function (row) {
@@ -139,12 +145,12 @@ function produto() {
         peso: Number(row[4].replace(",", ".")),
       };
       queue.enqueue(() =>
-        postData({ toString: () => "http://localhost:3000/produto" }, produto)
+        postData({ toString: () => "http://localhost:3000/produto" }, produto, token)
       );
     });
 }
 
-async function postData(url = "", data = {}) {
+async function postData(url = "", data = {}, token = null) {
   const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
   });
@@ -157,7 +163,7 @@ async function postData(url = "", data = {}) {
     credentials: "same-origin", // include, *same-origin, omit
     headers: {
       "Content-Type": "application/json",
-      // 'Content-Type': 'application/x-www-form-urlencoded',
+      "x-access-token": token,
     },
     redirect: "follow", // manual, *follow, error
     referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
