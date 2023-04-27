@@ -25,10 +25,10 @@ auth.then((data) => {
   console.log(data);
   const token = data.accessToken;
 
-  produto();
-  fornecedor();
-  pedidoCompra();
-  pessoa();
+  // produto(token);
+  // fornecedor(token);
+  // pedidoCompra(token);
+  pessoa(token);
 });
 
 function pedidoCompra(token) {
@@ -72,15 +72,13 @@ function pedidoCompra(token) {
 
       queue.enqueue(() =>
         postData(
-          { toString: () => "http://localhost:3000/pedidocompra/import" },
+          { toString: () => "http://localhost:2486/pedidocompra/import" },
           pedido,
           token
         )
       );
     });
 }
-
-
 
 function fornecedor(token) {
   fs.createReadStream("./fornecedor.csv")
@@ -104,7 +102,11 @@ function fornecedor(token) {
         },
       };
       queue.enqueue(() =>
-        postData({ toString: () => "http://localhost:3000/pessoa" }, pessoa, token)
+        postData(
+          { toString: () => "http://localhost:2486/pessoa" },
+          pessoa,
+          token
+        )
       );
     });
 }
@@ -128,9 +130,11 @@ function pessoa(token) {
         telefone:
           row[14].replace(/\D/g, "") == "" ? null : row[14].replace(/\D/g, ""),
       };
-      queue.enqueue(() =>
-        postData({ toString: () => "http://localhost:3000/pessoa" }, token)
-      );
+
+      queue.enqueue(() => {
+        console.log(pessoa);
+        postData({ toString: () => "http://localhost:2486/pessoa" }, pessoa, token);
+      });
     });
 }
 
@@ -145,7 +149,11 @@ function produto(token) {
         peso: Number(row[4].replace(",", ".")),
       };
       queue.enqueue(() =>
-        postData({ toString: () => "http://localhost:3000/produto" }, produto, token)
+        postData(
+          { toString: () => "http://localhost:2486/produto" },
+          produto,
+          token
+        )
       );
     });
 }
